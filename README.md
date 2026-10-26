@@ -112,6 +112,14 @@ Results land in `runs_seg/<dataset>/report.md`, `summary.json` and `figures/`.
    bash scripts/run_server.sh evaluate                                     # score saved checkpoints, no training
    ```
    Each script also runs on its own: `uv run python scripts/project_train.py --help`.
+
+   **Choosing the device:** every entry point takes `--gpu <index>` (the number `nvidia-smi` shows) or
+   `--gpu cpu`: `run_server.sh`, the `scripts/*.py`, `main.py` and `python -m fbseg`; in the notebook set
+   `GPU = 1` in the first cell. Without it, GPU 0 is used. Two parts can share the two GPUs at once:
+   ```bash
+   nohup bash scripts/run_server.sh project --gpu 0 > logs/project.out 2>&1 &
+   nohup bash scripts/run_server.sh miniproject --gpu 1 > logs/miniproject.out 2>&1 &
+   ```
 4. **Results to send back:** `results_bundle/results_<timestamp>.zip` (written at the end of every
    `run_server.sh` call, or by `scripts/collect_results.py`): `runs/report.md`, `runs/profile.md`,
    `runs_seg/<dataset>/{report.md, summary.json, figures/}`, per-run metrics and the logs.

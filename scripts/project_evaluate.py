@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import argparse
 
-from _common import setup
+from _common import gpu_argument, setup
 
 setup()
 
@@ -23,6 +23,7 @@ def main() -> None:
     parser.add_argument("--repredict", action="store_true", help="predict again from best.pt before scoring")
     parser.add_argument("--bootstrap", type=int, default=2000)
     parser.add_argument("--profile", action="store_true")
+    gpu_argument(parser)
     args = parser.parse_args()
     print(reevaluate(RUNS_ROOT, CACHE_ROOT, args.repredict, args.bootstrap))
     if args.profile:

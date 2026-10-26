@@ -1,6 +1,7 @@
 """Command-line entry point for the NA-DyCNN reproduction.
 
 uv run python main.py prepare                         # QC + 256x256 cache for D1/D2/D3
+uv run python main.py train --source d2 --gpu 1       # any command: --gpu <nvidia-smi index> or --gpu cpu
 uv run python main.py train --method nadycnn --source d2 --seeds 0 1 2
 uv run python main.py experiment --sources d1 d2 --seeds 0 1 2   # all Table 3-8 runs
 uv run python main.py tune --source d2                # sigma/beta/N grid (Fig. 4)
@@ -18,6 +19,7 @@ from pathlib import Path
 
 from nadycnn import experiment
 from nadycnn.data import build_cache
+from nadycnn.devices import describe_device, select_device
 from nadycnn.evaluation import build_report, profile_models
 from nadycnn.training import METHODS, TrainConfig, train
 
@@ -88,11 +90,17 @@ def main() -> None:
     parser.add_argument("--bootstrap", type=int, default=2000)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument(
+        "--gpu",
+        help="GPU index as listed by nvidia-smi (e.g. 0 or 1), or 'cpu'",
+    )
+    parser.add_argument(
         "--repredict",
         action="store_true",
         help="evaluate: reload best.pt and predict again before scoring",
     )
     args = parser.parse_args()
+    select_device(args.gpu)
+    print(f"device: {describe_device()}")
 
     if args.command == "prepare":
         for dataset in ("d2", "d3", "d1"):

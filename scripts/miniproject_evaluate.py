@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import argparse
 
-from _common import setup
+from _common import gpu_argument, setup
 
 setup()
 
@@ -32,6 +32,7 @@ def main() -> None:
     parser.add_argument("--methods", nargs="+", choices=list(METHODS), help="default: all with checkpoints")
     parser.add_argument("--noise", nargs="+", type=float, default=list(NOISE_LEVELS),
                         help="extra test-time speckle levels")
+    gpu_argument(parser)
     args = parser.parse_args()
     report, _ = evaluate_saved(args.dataset, args.methods, tuple(args.noise))
     print(report)

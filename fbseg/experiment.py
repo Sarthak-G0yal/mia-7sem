@@ -7,6 +7,7 @@ CLI (also importable from the notebook: `from fbseg.experiment import run, evalu
     uv run python -m fbseg run --dataset duke_dme --methods unet feedback --seeds 0 1 2
     uv run python -m fbseg evaluate --dataset duke_dme                  # score saved checkpoints, no training
     uv run python -m fbseg report --dataset duke_dme                    # rebuild runs_seg/<dataset>/report.md
+    add --gpu 1 (nvidia-smi index) or --gpu cpu to choose the device
 """
 
 from __future__ import annotations
@@ -18,6 +19,8 @@ from dataclasses import fields
 from pathlib import Path
 
 import torch
+
+from nadycnn.devices import describe_device, select_device
 
 from . import DATA_ROOT, RUNS_ROOT
 from .data import SegData
@@ -104,7 +107,10 @@ def main() -> None:
     parser.add_argument("--num-folds", type=int, default=5)
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--gpu", help="GPU index as listed by nvidia-smi (e.g. 0 or 1), or 'cpu'")
     args = parser.parse_args()
+    select_device(args.gpu)
+    print(f"device: {describe_device()}")
     if args.command == "run":
         print(run(args.dataset, args.methods, args.seeds, args.epochs, args.folds, args.num_folds, args.overwrite)[0])
     elif args.command == "evaluate":

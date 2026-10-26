@@ -14,7 +14,7 @@ from __future__ import annotations
 import argparse
 import time
 
-from _common import setup
+from _common import gpu_argument, setup
 
 setup()
 
@@ -39,6 +39,7 @@ def main() -> None:
     parser.add_argument("--skip-prepare", action="store_true", help="cache/ already built")
     parser.add_argument("--no-profile", action="store_true", help="skip the Table 2 latency benchmark")
     parser.add_argument("--overwrite", action="store_true", help="retrain runs that already have metrics")
+    gpu_argument(parser)
     args = parser.parse_args()
 
     started = time.time()

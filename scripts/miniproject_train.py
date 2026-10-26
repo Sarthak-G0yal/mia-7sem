@@ -16,7 +16,7 @@ import argparse
 import time
 import zipfile
 
-from _common import setup
+from _common import gpu_argument, setup
 
 setup()
 
@@ -65,6 +65,7 @@ def main() -> None:
     parser.add_argument("--no-download", action="store_true")
     parser.add_argument("--no-fallback", action="store_true", help="fail instead of using synthetic data")
     parser.add_argument("--overwrite", action="store_true", help="retrain runs that already have metrics")
+    gpu_argument(parser)
     args = parser.parse_args()
 
     started = time.time()
