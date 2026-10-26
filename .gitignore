@@ -9,3 +9,10 @@ wheels/
 # Virtual environments
 .venv
 data/
+
+# Experiment artifacts
+cache/
+runs/
+runs_seg/
+logs/
+results_bundle/
