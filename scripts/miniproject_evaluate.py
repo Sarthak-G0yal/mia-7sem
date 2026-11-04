@@ -32,11 +32,12 @@ def main() -> None:
     parser.add_argument("--methods", nargs="+", choices=list(METHODS), help="default: all with checkpoints")
     parser.add_argument("--noise", nargs="+", type=float, default=list(NOISE_LEVELS),
                         help="extra test-time speckle levels")
+    parser.add_argument("--runs-root", default=RUNS_ROOT, help="folder with the runs (default: runs_seg)")
     gpu_argument(parser)
     args = parser.parse_args()
-    report, _ = evaluate_saved(args.dataset, args.methods, tuple(args.noise))
+    report, _ = evaluate_saved(args.dataset, args.methods, tuple(args.noise), runs_root=Path(args.runs_root))
     print(report)
-    save_all_figures(Path(RUNS_ROOT), args.dataset, SegData.load(args.dataset, Path(DATA_ROOT)))
+    save_all_figures(Path(args.runs_root), args.dataset, SegData.load(args.dataset, Path(DATA_ROOT)))
 
 
 if __name__ == "__main__":

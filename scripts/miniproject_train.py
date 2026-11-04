@@ -5,6 +5,8 @@ Script version of notebooks/feedback_segmentation.ipynb: data -> train -> evalua
     uv run python scripts/miniproject_train.py                         # Duke DME, 8 methods, 5 folds, seed 0, 30 epochs
     uv run python scripts/miniproject_train.py --folds 0 --epochs 10   # quick look (~10 min)
     uv run python scripts/miniproject_train.py --seeds 0 1 2           # more seeds for the final numbers
+    uv run python scripts/miniproject_train.py --train-noise-max 0.4 --smooth-prior 0.01 --edge-prior 0.01 \
+        --runs-root runs_seg_v2                                        # changed training settings, separate folder
 
 Writes runs_seg/<dataset>/<method>/fold<f>_seed<s>/{best.pt, history.json, metrics.json, qualitative.png},
 runs_seg/<dataset>/{report.md, summary.json} and runs_seg/<dataset>/figures/*.png. Finished runs are skipped.
@@ -30,6 +32,7 @@ from fbseg.data import SegData  # noqa: E402
 from fbseg.experiment import run  # noqa: E402
 from fbseg.models import METHODS  # noqa: E402
 from fbseg.plots import save_all_figures  # noqa: E402
+from fbseg.training import SegConfig  # noqa: E402
 
 
 def ensure_dataset(dataset: str, download: bool, fallback: bool) -> str:
@@ -65,6 +68,15 @@ def main() -> None:
     parser.add_argument("--no-download", action="store_true")
     parser.add_argument("--no-fallback", action="store_true", help="fail instead of using synthetic data")
     parser.add_argument("--overwrite", action="store_true", help="retrain runs that already have metrics")
+    parser.add_argument("--runs-root", default=RUNS_ROOT,
+                        help="output folder (default: runs_seg); use a new one when changing training settings")
+    parser.add_argument("--train-noise-max", type=float, default=SegConfig.train_noise_max,
+                        help="max extra training speckle sigma (applied to half of the images)")
+    parser.add_argument("--smooth-prior", type=float, default=SegConfig.smooth_prior,
+                        help="weight of the lambda >= 1/3 penalty (open_loop / feedback)")
+    parser.add_argument("--edge-prior", type=float, default=SegConfig.edge_prior,
+                        help="weight of the low-lambda-on-defect-boundaries penalty (open_loop / feedback)")
+    parser.add_argument("--patience", type=int, default=SegConfig.patience, help="early-stopping patience (epochs)")
     gpu_argument(parser)
     args = parser.parse_args()
 
@@ -76,10 +88,15 @@ def main() -> None:
           f"{100 * has_defect:.0f}% contain a defect, defect pixels {100 * data.masks.mean().item():.2f}%, "
           f"second annotator: {data.masks_expert2 is not None}")
 
-    report, _ = run(dataset, args.methods, args.seeds, args.epochs, args.folds, args.num_folds, args.overwrite)
+    overrides = {"train_noise_max": args.train_noise_max, "smooth_prior": args.smooth_prior,
+                 "edge_prior": args.edge_prior, "patience": args.patience}
+    runs_root = Path(args.runs_root)
+    print(f"runs -> {runs_root / dataset} | {overrides}")
+    report, _ = run(dataset, args.methods, args.seeds, args.epochs, args.folds, args.num_folds, args.overwrite,
+                    runs_root=runs_root, config_overrides=overrides)
     print(report)
-    save_all_figures(Path(RUNS_ROOT), dataset, data)
-    print(f"done in {(time.time() - started) / 60:.1f} min -> {Path(RUNS_ROOT) / dataset / 'summary.json'}")
+    save_all_figures(runs_root, dataset, data)
+    print(f"done in {(time.time() - started) / 60:.1f} min -> {runs_root / dataset / 'summary.json'}")
 
 
 if __name__ == "__main__":

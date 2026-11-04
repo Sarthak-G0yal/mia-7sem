@@ -18,9 +18,9 @@ PATTERNS = (
     "runs/report.md", "runs/profile.md", "runs/*.log",
     "runs/d[12]/*/seed*/metrics.json", "runs/d[12]/*/seed*/history.json",
     "runs/d[12]/*/seed*/summary.json", "runs/d[12]/*/seed*/config.json", "runs/tune/*.json",
-    "runs_seg/*/report.md", "runs_seg/*/summary.json", "runs_seg/*/figures/*.png",
-    "runs_seg/*/*/fold*_seed*/metrics.json", "runs_seg/*/*/fold*_seed*/history.json",
-    "runs_seg/*/*/fold*_seed*/config.json", "runs_seg/*/*/fold*_seed*/qualitative.png",
+    "runs_seg*/*/report.md", "runs_seg*/*/summary.json", "runs_seg*/*/figures/*.png",
+    "runs_seg*/*/*/fold*_seed*/metrics.json", "runs_seg*/*/*/fold*_seed*/history.json",
+    "runs_seg*/*/*/fold*_seed*/config.json", "runs_seg*/*/*/fold*_seed*/qualitative.png",
     "logs/*.log",
 )
 
@@ -36,7 +36,7 @@ def main() -> None:
         for path in files:
             handle.write(path, path.relative_to(ROOT))
     print(f"{len(files)} files, {archive.stat().st_size / 1e6:.1f} MB -> {archive}")
-    for summary in ("runs/report.md", *(str(p.relative_to(ROOT)) for p in ROOT.glob("runs_seg/*/report.md"))):
+    for summary in ("runs/report.md", *(str(p.relative_to(ROOT)) for p in ROOT.glob("runs_seg*/*/report.md"))):
         if (ROOT / summary).exists():
             print(f"  includes {summary}")
 
