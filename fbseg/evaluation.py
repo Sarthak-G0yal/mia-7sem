@@ -120,7 +120,7 @@ def build_report(runs_root: Path, dataset: str) -> tuple[str, dict]:
     runs = defaultdict(list)
     for path in sorted((runs_root / dataset).glob("*/fold*_seed*/metrics.json")):
         runs[path.parts[-3]].append(json.loads(path.read_text()))
-    order = ["unet_linear", "unet", "fixed_0.33", "fixed_0.67", "fixed_1.0", "open_loop", "feedback", "feedback_linear"]
+    order = ["unet_linear", "unet", "fixed_0.33", "fixed_0.67", "fixed_1.0", "open_loop", "feedback", "feedback_noise", "feedback_linear"]
     methods = [m for m in order if m in runs] + sorted(m for m in runs if m not in order)
     summary = {"dataset": dataset, "methods": {},
                "runs": {m: sorted(f"fold{r['fold']}_seed{r['seed']}" for r in runs[m]) for m in methods}}

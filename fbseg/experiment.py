@@ -51,7 +51,8 @@ def evaluate_and_save(model: FeedbackSegmenter, config: SegConfig, data: SegData
 
 def run(dataset: str, methods: list[str], seeds: list[int], epochs: int, folds: list[int] | None = None,
         num_folds: int = 5, overwrite: bool = False, data_root: Path = Path(DATA_ROOT),
-        runs_root: Path = Path(RUNS_ROOT), config_overrides: dict | None = None) -> tuple[str, dict]:
+        runs_root: Path = Path(RUNS_ROOT), config_overrides: dict | None = None,
+        noise_levels: tuple[float, ...] = NOISE_LEVELS) -> tuple[str, dict]:
     """Train + evaluate every (fold, seed, method); `folds=None` runs all `num_folds` folds.
 
     `config_overrides` sets other SegConfig fields (e.g. {"train_noise_max": 0.4}) for every run."""
@@ -64,7 +65,7 @@ def run(dataset: str, methods: list[str], seeds: list[int], epochs: int, folds: 
         config = SegConfig(method=method, dataset=dataset, seed=seed, fold=fold, folds=num_folds, epochs=epochs,
                            **(config_overrides or {}))
         model = train_segmenter(config, data, out_dir)
-        evaluate_and_save(model, config, data, out_dir)
+        evaluate_and_save(model, config, data, out_dir, noise_levels)
     return write_report(dataset, runs_root)
 
 

@@ -13,6 +13,7 @@ import numpy as np
 METHOD_COLORS = {
     "unet_linear": "#2a78d6", "unet": "#eb6834", "fixed_0.33": "#1baf7a", "fixed_0.67": "#eda100",
     "fixed_1.0": "#e87ba4", "open_loop": "#008300", "feedback": "#6250d6", "feedback_linear": "#e34948",
+    "feedback_noise": "#0091a8",
 }
 TEXT, MUTED, GRID = "#0b0b0b", "#52514e", "#e4e3df"
 
@@ -60,7 +61,7 @@ def plot_robustness(runs: dict[str, list[dict]], metrics: tuple[str, ...] = ("di
 
 def plot_lambda_regions(runs: dict[str, list[dict]], level: str = "sigma_0.0"):
     """Mean final-iteration lambda per region for the learned-lambda methods (grouped bars)."""
-    methods = [m for m in ("open_loop", "feedback", "feedback_linear") if m in runs]
+    methods = [m for m in ("open_loop", "feedback", "feedback_noise", "feedback_linear") if m in runs]
     regions = ("boundary", "defect_interior", "background")
     figure, axis = plt.subplots(figsize=(6.5, 3.6))
     width = 0.8 / max(1, len(methods))
@@ -130,10 +131,10 @@ def save_all_figures(runs_root: Path, dataset: str, data=None) -> list[Path]:
     if runs:
         figures["robustness"] = plot_robustness(runs, ("dice", "boundary_f1", "small_defect_recall"))
         figures["robustness_hd95"] = plot_robustness(runs, ("hd95",))
-        if any(m in runs for m in ("open_loop", "feedback", "feedback_linear")):
-            for level in ("sigma_0.0", "sigma_0.3"):
-                if level in next(iter(runs.values()))[0]["test"]:
-                    figures[f"lambda_regions_{level}"] = plot_lambda_regions(runs, level)
+        if any(m in runs for m in ("open_loop", "feedback", "feedback_noise", "feedback_linear")):
+            levels = sorted(next(iter(runs.values()))[0]["test"], key=lambda k: float(k.split("_")[1]))
+            for level in dict.fromkeys((levels[0], levels[-1])):  # cleanest and noisiest test level
+                figures[f"lambda_regions_{level}"] = plot_lambda_regions(runs, level)
         figures["training_curves_fold0"] = plot_training_curves(runs_root, dataset)
     if data is not None:
         scale_space = plot_scale_space(runs_root, dataset, data)

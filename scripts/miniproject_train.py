@@ -29,6 +29,7 @@ import numpy as np  # noqa: E402
 import download_data  # noqa: E402
 from fbseg import DATA_ROOT, RUNS_ROOT  # noqa: E402
 from fbseg.data import SegData  # noqa: E402
+from fbseg.evaluation import NOISE_LEVELS  # noqa: E402
 from fbseg.experiment import run  # noqa: E402
 from fbseg.models import METHODS  # noqa: E402
 from fbseg.plots import save_all_figures  # noqa: E402
@@ -76,6 +77,8 @@ def main() -> None:
                         help="weight of the lambda >= 1/3 penalty (open_loop / feedback)")
     parser.add_argument("--edge-prior", type=float, default=SegConfig.edge_prior,
                         help="weight of the low-lambda-on-defect-boundaries penalty (open_loop / feedback)")
+    parser.add_argument("--noise", nargs="+", type=float, default=list(NOISE_LEVELS),
+                        help="extra test-time speckle levels to evaluate (default: 0 0.1 0.2 0.3)")
     parser.add_argument("--patience", type=int, default=SegConfig.patience, help="early-stopping patience (epochs)")
     gpu_argument(parser)
     args = parser.parse_args()
@@ -93,7 +96,8 @@ def main() -> None:
     runs_root = Path(args.runs_root)
     print(f"runs -> {runs_root / dataset} | {overrides}")
     report, _ = run(dataset, args.methods, args.seeds, args.epochs, args.folds, args.num_folds, args.overwrite,
-                    runs_root=runs_root, config_overrides=overrides)
+                    runs_root=runs_root, config_overrides=overrides,
+                    noise_levels=tuple(args.noise))
     print(report)
     save_all_figures(runs_root, dataset, data)
     print(f"done in {(time.time() - started) / 60:.1f} min -> {runs_root / dataset / 'summary.json'}")

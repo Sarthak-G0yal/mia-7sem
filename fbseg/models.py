@@ -146,15 +146,16 @@ class ScaleSpaceSmoother(nn.Module):
 
 
 class LambdaController(nn.Module):
-    """Feedback update: z_{t+1} = z_t + g(confidence, boundary, |grad x_s|, lambda_t), lambda = bounded(z).
+    """Feedback update: z_{t+1} = z_t + g(confidence, boundary, |grad x_s|, lambda_t[, noise]), lambda = bounded(z).
 
     The last layer starts at zero, so the loop begins as "keep the current smoothing" and learns from the
-    segmentation loss when to smooth more (unsure + no boundary) or less (boundary)."""
+    segmentation loss when to smooth more (unsure + no boundary) or less (boundary). With `noise_input` it also
+    sees the local noise estimate (see `local_noise`)."""
 
-    def __init__(self, hidden: int = 16):
+    def __init__(self, hidden: int = 16, noise_input: bool = False):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Conv2d(4, hidden, 3, padding=1), nn.ReLU(inplace=True),
+            nn.Conv2d(5 if noise_input else 4, hidden, 3, padding=1), nn.ReLU(inplace=True),
             nn.Conv2d(hidden, hidden, 3, padding=2, dilation=2), nn.ReLU(inplace=True),
             nn.Conv2d(hidden, 1, 3, padding=1),
         )
@@ -162,18 +163,21 @@ class LambdaController(nn.Module):
         nn.init.zeros_(self.net[-1].bias)
 
     def forward(self, z: torch.Tensor, confidence: torch.Tensor, boundary: torch.Tensor,
-                smoothed: torch.Tensor) -> torch.Tensor:
-        features = torch.cat([confidence, boundary, image_gradient(smoothed), bounded_lambda(z)], dim=1)
-        return z + self.net(features)
+                smoothed: torch.Tensor, noise: torch.Tensor | None = None) -> torch.Tensor:
+        features = [confidence, boundary, image_gradient(smoothed), bounded_lambda(z)]
+        if noise is not None:
+            features.append(noise)
+        return z + self.net(torch.cat(features, dim=1))
 
 
 class InitialLambda(nn.Module):
-    """Open-loop z_0 (lambda_0 = bounded(z_0)) predicted from the raw image alone."""
+    """Open-loop z_0 (lambda_0 = bounded(z_0)) predicted from the raw image (and, with `noise_input`, the
+    local noise estimate as a second channel)."""
 
-    def __init__(self, hidden: int = 16, start: float = 0.33):
+    def __init__(self, hidden: int = 16, start: float = 0.33, noise_input: bool = False):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Conv2d(1, hidden, 3, padding=1), nn.ReLU(inplace=True),
+            nn.Conv2d(2 if noise_input else 1, hidden, 3, padding=1), nn.ReLU(inplace=True),
             nn.Conv2d(hidden, hidden, 3, padding=2, dilation=2), nn.ReLU(inplace=True),
             nn.Conv2d(hidden, 1, 3, padding=1),
         )
@@ -183,6 +187,15 @@ class InitialLambda(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x)
+
+
+def local_noise(x: torch.Tensor, denoised: torch.Tensor, window: int = 15) -> torch.Tensor:
+    """Local relative noise level: RMS of the denoiser residual x - D(x) over a window, divided by the local
+    mean intensity (the speckle is multiplicative, so this reads roughly as the speckle sigma). Clamped to [0, 3]."""
+    def local_mean(t: torch.Tensor) -> torch.Tensor:
+        return F.avg_pool2d(t, window, stride=1, padding=window // 2, count_include_pad=False)
+    rms = local_mean((x - denoised) ** 2).add(1e-8).sqrt()
+    return (rms / (local_mean(denoised) + 0.05)).clamp(0.0, 3.0)
 
 
 def image_gradient(x: torch.Tensor) -> torch.Tensor:
@@ -198,6 +211,7 @@ class MethodSpec:
     head: str = "hyperspherical"
     fixed_lambda: float = 0.0
     iterations: int = 1
+    noise_input: bool = False  # give the lambda networks the local noise estimate as an extra input
 
 
 METHODS = {
@@ -209,6 +223,7 @@ METHODS = {
     "open_loop": MethodSpec("open_loop"),                           # learned lambda map from the image only
     "feedback": MethodSpec("feedback", iterations=3),               # proposed: closed-loop, hyperspherical
     "feedback_linear": MethodSpec("feedback", head="linear", iterations=3),  # ablation: softmax confidence
+    "feedback_noise": MethodSpec("feedback", iterations=3, noise_input=True),  # feedback + local noise estimate
 }
 
 
@@ -222,8 +237,9 @@ class FeedbackSegmenter(nn.Module):
         self.unet = UNet()
         self.head = (HypersphericalHead(self.unet.out_channels, num_classes) if spec.head == "hyperspherical"
                      else LinearHead(self.unet.out_channels, num_classes))
-        self.initial = InitialLambda() if spec.smoothing in ("open_loop", "feedback") else None
-        self.controller = LambdaController() if spec.smoothing == "feedback" else None
+        self.initial = (InitialLambda(noise_input=spec.noise_input) if spec.smoothing in ("open_loop", "feedback")
+                        else None)
+        self.controller = LambdaController(noise_input=spec.noise_input) if spec.smoothing == "feedback" else None
 
     @property
     def denoiser(self) -> Denoiser | None:
@@ -232,7 +248,11 @@ class FeedbackSegmenter(nn.Module):
     def forward(self, x: torch.Tensor) -> dict[str, list[torch.Tensor]]:
         outputs = {"logits": [], "boundary_logits": [], "confidence": [], "lambda": [], "smoothed": []}
         levels = self.smoother.stack(x) if self.smoother is not None else None
-        z = self.initial(x) if self.initial is not None else None
+        noise = local_noise(levels[0], levels[1]) if self.spec.noise_input else None
+        if self.initial is None:
+            z = None
+        else:
+            z = self.initial(torch.cat([x, noise], dim=1) if noise is not None else x)
         for step in range(self.spec.iterations):
             if self.spec.smoothing == "none":
                 lam, smoothed = torch.zeros_like(x), x
@@ -245,7 +265,7 @@ class FeedbackSegmenter(nn.Module):
             outputs["lambda"].append(lam)
             outputs["smoothed"].append(smoothed)
             if self.controller is not None and step + 1 < self.spec.iterations:
-                z = self.controller(z, out["confidence"], torch.sigmoid(out["boundary_logits"]), smoothed)
+                z = self.controller(z, out["confidence"], torch.sigmoid(out["boundary_logits"]), smoothed, noise)
         return outputs
 
 
