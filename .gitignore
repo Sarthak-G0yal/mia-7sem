@@ -14,5 +14,6 @@ data/
 cache/
 runs/
 runs_seg/
+runs_seg_*/
 logs/
 results_bundle/
