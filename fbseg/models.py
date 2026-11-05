@@ -221,6 +221,7 @@ METHODS = {
     "fixed_0.67": MethodSpec("fixed", fixed_lambda=2 / 3),         # constant: denoiser + Gaussian sigma 1
     "fixed_1.0": MethodSpec("fixed", fixed_lambda=1.0),            # constant: denoiser + Gaussian sigma 2
     "open_loop": MethodSpec("open_loop"),                           # learned lambda map from the image only
+    "open_loop_noise": MethodSpec("open_loop", noise_input=True),   # ablation: noise input, no feedback loop
     "feedback": MethodSpec("feedback", iterations=3),               # proposed: closed-loop, hyperspherical
     "feedback_linear": MethodSpec("feedback", head="linear", iterations=3),  # ablation: softmax confidence
     "feedback_noise": MethodSpec("feedback", iterations=3, noise_input=True),  # feedback + local noise estimate
